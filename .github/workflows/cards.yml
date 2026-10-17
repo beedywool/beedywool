@@ -1,0 +1,39 @@
+name: Update place cards
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [build.py]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cards
+  cancel-in-progress: true
+
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python build.py places
+
+      # Branche orpheline à un seul commit, écrasée à chaque passage
+      - name: Publish to the cards branch
+        working-directory: cards
+        run: |
+          git init -q -b cards
+          git add .
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898099+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Update place cards"
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" cards
