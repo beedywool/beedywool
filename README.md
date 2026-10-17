@@ -27,12 +27,12 @@
 </a>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/beedywool/beedywool/cards/home-dark.svg">
-  <img width="49%" alt="Based in Montpellier, France" src="https://raw.githubusercontent.com/beedywool/beedywool/cards/home-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards/home-dark.svg">
+  <img width="49%" alt="Based in Montpellier, France" src="https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards/home-light.svg">
 </picture>
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/beedywool/beedywool/cards/dream-dark.svg">
-  <img width="49%" alt="Where I want to go: Guadalajara, Mexico" src="https://raw.githubusercontent.com/beedywool/beedywool/cards/dream-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards/dream-dark.svg">
+  <img width="49%" alt="Where I want to go: Guadalajara, Mexico" src="https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards/dream-light.svg">
 </picture>
 
 <br><br>
