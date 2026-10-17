@@ -19,13 +19,13 @@ from zoneinfo import ZoneInfo
 
 # ─── À personnaliser ─────────────────────────────────────────────────────────
 NAME = "beedywool"
-TAGLINE = "Full-stack developer · Creative coder"
+TAGLINE = "Full-stack developer"
 GREETING = "👋  Hello, world"
-PILLS = ["Web", "Cloud", "Design"]
+PILLS = ["Web", "Cloud"]
 
-BIO = ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor "
-       "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud "
-       "exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.")
+BIO = ("I'm a full stack developer cumulating 10+ years of experience in web development, starting with video games in middle school."
+" My goal is to create innovative and immersives experiences spanning into the real world with AR and VR technologies to make it a little bit livelier, even for just a few minutes."
+" The old spark technology used to have is what I am seeking.")
 
 ABOUT = [
     ("Currently working on", "An online store for neo-retro consoles"),
@@ -205,6 +205,13 @@ def header(c):
         )
         x += pw + 8
     chip_w = text_width(GREETING, 14) + 28
+    # Chip drapeau arc-en-ciel à côté du « Hello, world »
+    px = 48 + chip_w + 8
+    pride_w = 12 + 24 + 8 + title_width("Pride", 14) + 14
+    stripes = "".join(
+        f'<rect x="{px + 12}" y="{52 + i * 16 / 6:.2f}" width="24" height="{16 / 6 + .3:.2f}" fill="#{col}"/>'
+        for i, col in enumerate(["E40303", "FF8C00", "FFED00", "008026", "004CFF", "732982"])
+    )
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
 <title>{escape(NAME)} — {escape(TAGLINE)}</title>
 {base_style(c)}
@@ -222,6 +229,10 @@ def header(c):
 <g class="fade">
   <rect x="48" y="44" width="{chip_w:.0f}" height="32" rx="8" fill="none" stroke="#{c['outline']}"/>
   <text x="62" y="65" font-size="14" font-weight="500" fill="#{c['on_sv']}">{escape(GREETING)}</text>
+  <rect x="{px}" y="44" width="{pride_w:.0f}" height="32" rx="8" fill="none" stroke="#{c['outline']}"/>
+  <clipPath id="pride"><rect x="{px + 12}" y="52" width="24" height="16" rx="3"/></clipPath>
+  <g clip-path="url(#pride)">{stripes}</g>
+  <text x="{px + 44}" y="65" font-size="14" font-weight="500" fill="#{c['on_sv']}">Pride</text>
   <text x="44" y="158" font-size="68" font-weight="500" letter-spacing="-1" fill="#{c['on_surface']}">{escape(NAME)}</text>
   <text x="48" y="198" font-size="21" fill="#{c['on_sv']}">{escape(TAGLINE)}</text>
   {''.join(pills)}
