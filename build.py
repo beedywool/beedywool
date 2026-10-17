@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from html import escape
@@ -23,7 +24,7 @@ TAGLINE = "Full-stack developer"
 GREETING = "👋  Hello, world"
 PILLS = ["Web", "Cloud"]
 
-BIO = ("I'm a full stack developer cumulating 10+ years of experience in web development, starting with video games in middle school."
+BIO = ("I'm a full stack developer cumulating 10+ years of experience in development, starting with video games in middle school."
 " My goal is to create innovative and immersives experiences spanning into the real world with AR and VR technologies to make it a little bit livelier, even for just a few minutes."
 " The old spark technology used to have is what I am seeking.")
 
@@ -32,16 +33,13 @@ ABOUT = [
     ("Currently learning", "Unity and VR/AR development"),
     ("My hobby", "Travel and technology"),]
 
+# Seul le lien est obligatoire : titre, artiste et pochette viennent de YouTube
+# (ajoute title= ou artist= pour les remplacer)
 SONG = dict(
-    title="Wrong World",
-    artist="TOGENASHI TOGEARI",
+    url="https://www.youtube.com/watch?v=MSmfAa_oSqE",
     album="雑踏、僕らの街",
-    cover="assets/cover.jpg",
 )
 
-# scene : "montpellier" ou "guadalajara" (paysages dessinés plus bas)
-# photo : chemin d'une image (jpg/png ~1000 px de large) qui remplace le dessin
-# flag  : "FR" ou "MX" (drapeaux dessinés plus bas)
 PLACES = [
     dict(key="home", label="Based in", city="Montpellier", country="France",
          tz="Europe/Paris", scene="montpellier", photo="assets/montpellier.jpg", flag="FR"),
@@ -55,7 +53,6 @@ SECTIONS = {
     "stack": "Tech stack",
 }
 
-# (libellé, slug Simple Icons, couleur de la marque)
 STACK = {
     "Languages": [
         ("JavaScript", "javascript", "F7DF1E"), ("TypeScript", "typescript", "3178C6"),
@@ -105,7 +102,6 @@ STACK = {
 }
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Palette de base Material 3 (seed #6750A4)
 SCHEMES = {
     "dark": dict(
         surface="141218", sc="211F26", sch="2B2930",
@@ -126,16 +122,14 @@ SCHEMES = {
 FONT = "'Google Sans Flex','Google Sans','Roboto Flex',Roboto,'Segoe UI',system-ui,sans-serif"
 OUT = Path(__file__).parent / "assets"
 ICONS = Path(__file__).parent / "icons"
-# Cartes « lieux » : regénérées toutes les 30 min par la GitHub Action
 CARDS = Path(__file__).parent / "cards"
-# Largeur commune de toutes les images, et espace entre deux cartes
 W, GAP = 1000, 12
 # Certaines icônes (ex. Playwright) ont disparu des versions récentes
 ICON_SOURCES = ["13.21.0", "9.21.0"]
+CACHE = Path(__file__).parent / ".cache"
 
 
 def polar_shape(cx, cy, r, lobes, depth, steps=240):
-    """Formes « expressive » M3 : cookie, clover, sunny… (rayon modulé)."""
     pts = []
     for i in range(steps):
         t = 2 * math.pi * i / steps
@@ -186,7 +180,6 @@ def title_width(s, size):
 
 
 def text_width(s, size):
-    # Approximation suffisante pour dimensionner les pilules
     return sum(0.68 if ch.isupper() else 0.56 for ch in s) * size
 
 
@@ -206,7 +199,6 @@ def header(c):
         x += pw + 8
     # Les emoji sont plus larges que les lettres : environ 0,8 em
     chip_w = title_width(GREETING, 14) + 28 + sum(.2 * 14 for ch in GREETING if ord(ch) > 0xFFFF)
-    # Chip drapeau arc-en-ciel à côté du « Hello, world »
     px = 48 + chip_w + 8
     pride_w = 12 + 24 + 12
     stripes = "".join(
@@ -309,7 +301,6 @@ def about(c):
 
 
 def icon_path(slug):
-    """Tracé 24×24 Simple Icons, mis en cache dans icons/."""
     ICONS.mkdir(exist_ok=True)
     cached = ICONS / f"{slug}.svg"
     if not cached.exists():
@@ -342,7 +333,6 @@ def contrast(a, b):
 
 
 def legible(hex_, bg, target=3.0):
-    """Assombrit / éclaircit la couleur de marque jusqu'à être lisible sur bg."""
     r, g, b = (int(hex_[i:i + 2], 16) / 255 for i in (0, 2, 4))
     h, l, s = colorsys.rgb_to_hls(r, g, b)
     step = -0.02 if luminance(bg) > 0.5 else 0.02
@@ -400,7 +390,6 @@ def stack(c):
 """
 
 
-# Icônes Material Symbols (grille 24×24)
 MI = dict(
     pin="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
     prev="M6 6h2v12H6zm3.5 6 8.5 6V6z",
@@ -414,11 +403,59 @@ def icon(name, x, y, size, fill):
     return f'<path transform="translate({x} {y}) scale({size / 24:.3f})" d="{MI[name]}" fill="#{fill}"/>'
 
 
-def song(c):
+def song_info():
+    m = re.search(r"(?:v=|youtu\.be/|/shorts/|/embed/)([\w-]{11})", SONG["url"])
+    if not m:
+        raise SystemExit(f"Lien YouTube non reconnu : {SONG['url']}")
+    vid = m.group(1)
+    url = f"https://www.youtube.com/watch?v={vid}"
+    CACHE.mkdir(exist_ok=True)
+    meta_file, cover_file = CACHE / f"song-{vid}.json", CACHE / f"cover-{vid}.jpg"
+    if not meta_file.exists():
+        meta = json.load(urllib.request.urlopen(
+            f"https://www.youtube.com/oembed?url={urllib.parse.quote(url)}&format=json", timeout=15))
+        # maxresdefault est en 16:9 ; hqdefault (4:3) a des bandes noires en haut et en bas
+        for name, letterbox in (("maxresdefault", False), ("hqdefault", True)):
+            try:
+                cover_file.write_bytes(urllib.request.urlopen(
+                    f"https://i.ytimg.com/vi/{vid}/{name}.jpg", timeout=15).read())
+                meta["letterbox"] = letterbox
+                break
+            except OSError:
+                continue
+        meta_file.write_text(json.dumps(meta))
+    meta = json.loads(meta_file.read_text())
+    return dict(
+        url=url,
+        title=SONG.get("title") or meta["title"],
+        artist=SONG.get("artist") or meta["author_name"].removesuffix(" - Topic"),
+        album=SONG.get("album", ""),
+        cover=base64.b64encode(cover_file.read_bytes()).decode(),
+        letterbox=meta["letterbox"],
+    )
+
+
+def sync_readme(info):
+    readme = Path(__file__).parent / "README.md"
+    alt = escape(f"Favorite song — {info['title']} by {info['artist']}")
+    text = re.sub(
+        r'<a href="[^"]*">(<picture><source media="\(prefers-color-scheme: dark\)" srcset="assets/song-dark.svg">'
+        r'<img align="top" width="100%" )alt="[^"]*"',
+        lambda m: f'<a href="{info["url"]}">{m.group(1)}alt="{alt}"', readme.read_text())
+    readme.write_text(text)
+
+
+def song(c, info):
     w, h = W, 232
     dx = W - 900
-    cover = base64.b64encode((Path(__file__).parent / SONG["cover"]).read_bytes()).decode()
-    img = f"data:image/jpeg;base64,{cover}"
+    img = f"data:image/jpeg;base64,{info['cover']}"
+    # Pochette : recadrage carré au centre, en sautant les bandes noires du format 4:3
+    if info["letterbox"]:
+        aw, ah = 184 * 16 / 9, 184 / .75
+        art = f'x="{24 - (aw - 184) / 2:.1f}" y="{24 - (ah - 184) / 2:.1f}" width="{aw:.1f}" height="{ah:.1f}" preserveAspectRatio="none"'
+    else:
+        art = 'x="24" y="24" width="184" height="184" preserveAspectRatio="xMidYMid slice"'
+    subtitle = f"{info['artist']}  ·  {info['album']}" if info["album"] else info["artist"]
     x0, y0, prog_w, played = 232, 186, 444 + dx, .55
     amp, wl = 3.5, 24
     wave = " L".join(
@@ -428,7 +465,7 @@ def song(c):
     px = prog_w * played
     on_p = c['pc'] if c is SCHEMES['dark'] else 'FFFFFF'
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
-<title>Favorite song — {escape(SONG['title'])} by {escape(SONG['artist'])}</title>
+<title>Favorite song — {escape(info['title'])} by {escape(info['artist'])}</title>
 {base_style(c)}
 <style>
   .wave {{ animation: wave 2.8s linear infinite; }}
@@ -444,13 +481,13 @@ def song(c):
   <image href="{img}" x="-50" y="{-(w + 100 - h) / 2:.0f}" width="{w + 100}" height="{w + 100}" filter="url(#blur)" preserveAspectRatio="xMidYMid slice"/>
   <rect width="{w}" height="{h}" fill="#{c['sc']}" opacity=".8"/>
 </g>
-<image href="{img}" x="24" y="24" width="184" height="184" clip-path="url(#art)" preserveAspectRatio="xMidYMid slice"/>
+<g clip-path="url(#art)"><image href="{img}" {art}/></g>
 <g class="fade">
   <rect x="{x0}" y="24" width="{title_width('Favorite song', 15) + 52:.0f}" height="34" rx="17" fill="#{c['primary']}"/>
   {icon('note', x0 + 12, 32, 18, on_p)}
   <text x="{x0 + 36}" y="46" font-size="15" font-weight="600" fill="#{on_p}">Favorite song</text>
-  <text x="{x0}" y="102" font-size="36" font-weight="500" fill="#{c['on_surface']}">{escape(SONG['title'])}</text>
-  <text x="{x0}" y="136" font-size="19" fill="#{c['on_sv']}">{escape(SONG['artist'])}  ·  {escape(SONG['album'])}</text>
+  <text x="{x0}" y="102" font-size="36" font-weight="500" fill="#{c['on_surface']}">{escape(info['title'])}</text>
+  <text x="{x0}" y="136" font-size="19" fill="#{c['on_sv']}">{escape(subtitle)}</text>
   <g transform="translate({x0} {y0})">
     <g clip-path="url(#played)"><path class="wave" d="M{wave}" fill="none" stroke="#{c['primary']}" stroke-width="4" stroke-linecap="round"/></g>
     <rect x="{px + 10:.0f}" y="-2" width="{prog_w - px - 10:.0f}" height="4" rx="2" fill="#{c['outline_v']}"/>
@@ -468,7 +505,6 @@ def song(c):
 """
 
 
-# Ciels par moment de la journée
 PHASES = {
     "day": dict(sky1="7FB2F0", sky2="DCE9FF", orb="FFD86B", far="8FA9C9", mid="6E9A62",
                 near="557F4B", detail="3F6338", accent="F2C14E", agave="5E9C93", stone="E9D9BF"),
@@ -537,7 +573,6 @@ def agave(x, y, s, fill):
 
 
 def scene_guadalajara(p, w, h):
-    # Cathédrale : deux tours à flèches jaunes, dôme central
     cx, base = 230, 156
     def tower(tx):
         return (f'<rect x="{tx - 11}" y="{base - 62}" width="22" height="62" fill="#{p["stone"]}"/>'
@@ -568,7 +603,6 @@ def tricolor(x, y, w, h, colors):
 def flag(code, x, y, w=27, h=18):
     body = {
         "FR": tricolor(x, y, w, h, ["002654", "FFFFFF", "ED2939"]),
-        # Mexique : écusson simplifié (aigle sur cactus, cercle de laurier)
         "MX": tricolor(x, y, w, h, ["006847", "FFFFFF", "CE1126"])
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2}" r="{h * .2:.1f}" fill="none" stroke="#5B8C3A" stroke-width="1.2"/>'
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2 - .5}" r="{h * .11:.1f}" fill="#8C5A2B"/>',
@@ -578,7 +612,6 @@ def flag(code, x, y, w=27, h=18):
             f'<rect x="{x + .5}" y="{y + .5}" width="{w - 1}" height="{h - 1}" rx="3.5" fill="none" stroke="#000" stroke-opacity=".15"/>')
 
 
-# Teinte appliquée aux photos selon le moment de la journée
 PHOTO_TINT = {"day": ("000000", 0), "golden": ("FF8A3D", .18), "night": ("0B1033", .5)}
 
 
@@ -627,7 +660,6 @@ def place(c, pl, now=None):
 
 
 def places(c, now=None):
-    """Les deux cartes lieux côte à côte dans une seule image."""
     pw, ph = (W - GAP) / 2, 336
     parts = []
     for i, pl in enumerate(PLACES):
@@ -644,7 +676,6 @@ def places(c, now=None):
 """
 
 
-# ─── Statistiques GitHub (lues via l'API, regénérées par la GitHub Action) ───
 LOGIN = "beedywool"
 STATS_QUERY = """query($login: String!) {
   user(login: $login) {
@@ -736,7 +767,6 @@ def mix(a, b, t):
 def stats(c, st):
     tones = ["pc", "secc", "tc", "pc"]
     kinds = ["cookie", "clover", "sunny", "flower"]
-    # Ligne 1 : tuiles chiffrées
     tiles = [("Stars earned", st["stars"]), ("Commits · 1 year", st["commits"]),
              ("Pull requests", st["prs"]), ("Repositories", st["repos"])]
     tw, th = (W - 3 * GAP) / 4, 116
@@ -750,7 +780,6 @@ def stats(c, st):
   <text x="{x + 24}" y="94" font-size="36" font-weight="500" fill="#{c['on_surface']}">{fmt(value)}</text>
 </g>""")
 
-    # Ligne 2 : série + langages
     y2, cw, ch = th + GAP, (W - GAP) / 2, 220
     cur, longest = streaks(st["days"])
     out.append(f"""<g class="fade" style="animation-delay:280ms" transform="translate(0 {y2})">
@@ -785,7 +814,6 @@ def stats(c, st):
   {''.join(seg)}{''.join(legend)}
 </g>""")
 
-    # Ligne 3 : calendrier de contributions
     y3 = y2 + ch + GAP
     weeks = st["weeks"][-53:]
     cell_gap = 4
@@ -824,7 +852,6 @@ def pad(svg):
 
 
 def build_live():
-    """Cartes qui changent : lieux (heure) et stats GitHub."""
     CARDS.mkdir(exist_ok=True)
     st = fetch_stats()
     for mode, c in SCHEMES.items():
@@ -839,11 +866,13 @@ def main():
     build_live()
     OUT.mkdir(exist_ok=True)
     kinds = ["cookie", "clover", "sunny", "flower"]
+    info = song_info()
+    sync_readme(info)
     for mode, c in SCHEMES.items():
         (OUT / f"header-{mode}.svg").write_text(pad(header(c)))
         (OUT / f"about-{mode}.svg").write_text(pad(about(c)))
         (OUT / f"stack-{mode}.svg").write_text(pad(stack(c)))
-        (OUT / f"song-{mode}.svg").write_text(pad(song(c)))
+        (OUT / f"song-{mode}.svg").write_text(pad(song(c, info)))
         for i, (key, title) in enumerate(SECTIONS.items()):
             (OUT / f"section-{key}-{mode}.svg").write_text(pad(section(c, key, title, kinds[i % 4], i + 1)))
     print(f"SVG générés dans {OUT}")
