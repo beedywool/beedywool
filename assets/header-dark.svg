@@ -23,12 +23,11 @@
   <rect x="630" y="22" width="88" height="34" rx="17" fill="#49454F" transform="rotate(-24 674 39)"/>
 </g>
 <g class="fade">
-  <rect x="48" y="44" width="147" height="32" rx="8" fill="none" stroke="#938F99"/>
+  <rect x="48" y="44" width="125" height="32" rx="8" fill="none" stroke="#938F99"/>
   <text x="62" y="65" font-size="14" font-weight="500" fill="#CAC4D0">👋  Hello, world</text>
-  <rect x="203.28000000000003" y="44" width="92" height="32" rx="8" fill="none" stroke="#938F99"/>
-  <clipPath id="pride"><rect x="215.28000000000003" y="52" width="24" height="16" rx="3"/></clipPath>
-  <g clip-path="url(#pride)"><rect x="215.28000000000003" y="52.00" width="24" height="2.97" fill="#E40303"/><rect x="215.28000000000003" y="54.67" width="24" height="2.97" fill="#FF8C00"/><rect x="215.28000000000003" y="57.33" width="24" height="2.97" fill="#FFED00"/><rect x="215.28000000000003" y="60.00" width="24" height="2.97" fill="#008026"/><rect x="215.28000000000003" y="62.67" width="24" height="2.97" fill="#004CFF"/><rect x="215.28000000000003" y="65.33" width="24" height="2.97" fill="#732982"/></g>
-  <text x="247.28000000000003" y="65" font-size="14" font-weight="500" fill="#CAC4D0">Pride</text>
+  <rect x="180.726" y="44" width="48" height="32" rx="8" fill="none" stroke="#938F99"/>
+  <clipPath id="pride"><rect x="192.726" y="52" width="24" height="16" rx="3"/></clipPath>
+  <g clip-path="url(#pride)"><rect x="192.726" y="52.00" width="24" height="2.97" fill="#E40303"/><rect x="192.726" y="54.67" width="24" height="2.97" fill="#FF8C00"/><rect x="192.726" y="57.33" width="24" height="2.97" fill="#FFED00"/><rect x="192.726" y="60.00" width="24" height="2.97" fill="#008026"/><rect x="192.726" y="62.67" width="24" height="2.97" fill="#004CFF"/><rect x="192.726" y="65.33" width="24" height="2.97" fill="#732982"/></g>
   <text x="44" y="158" font-size="68" font-weight="500" letter-spacing="-1" fill="#E6E0E9">beedywool</text>
   <text x="48" y="198" font-size="21" fill="#CAC4D0">Full-stack developer</text>
   <rect x="48" y="226" width="67" height="40" rx="20" fill="#4F378B"/><text x="82" y="251" font-size="15" font-weight="500" text-anchor="middle" fill="#EADDFF">Web</text><rect x="123.0" y="226" width="84" height="40" rx="20" fill="#4A4458"/><text x="165" y="251" font-size="15" font-weight="500" text-anchor="middle" fill="#E8DEF8">Cloud</text>

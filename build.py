@@ -204,10 +204,11 @@ def header(c):
             f'text-anchor="middle" fill="#{fg}">{escape(label)}</text>'
         )
         x += pw + 8
-    chip_w = text_width(GREETING, 14) + 28
+    # Les emoji sont plus larges que les lettres : environ 0,8 em
+    chip_w = title_width(GREETING, 14) + 28 + sum(.2 * 14 for ch in GREETING if ord(ch) > 0xFFFF)
     # Chip drapeau arc-en-ciel à côté du « Hello, world »
     px = 48 + chip_w + 8
-    pride_w = 12 + 24 + 8 + title_width("Pride", 14) + 14
+    pride_w = 12 + 24 + 12
     stripes = "".join(
         f'<rect x="{px + 12}" y="{52 + i * 16 / 6:.2f}" width="24" height="{16 / 6 + .3:.2f}" fill="#{col}"/>'
         for i, col in enumerate(["E40303", "FF8C00", "FFED00", "008026", "004CFF", "732982"])
@@ -232,7 +233,6 @@ def header(c):
   <rect x="{px}" y="44" width="{pride_w:.0f}" height="32" rx="8" fill="none" stroke="#{c['outline']}"/>
   <clipPath id="pride"><rect x="{px + 12}" y="52" width="24" height="16" rx="3"/></clipPath>
   <g clip-path="url(#pride)">{stripes}</g>
-  <text x="{px + 44}" y="65" font-size="14" font-weight="500" fill="#{c['on_sv']}">Pride</text>
   <text x="44" y="158" font-size="68" font-weight="500" letter-spacing="-1" fill="#{c['on_surface']}">{escape(NAME)}</text>
   <text x="48" y="198" font-size="21" fill="#{c['on_sv']}">{escape(TAGLINE)}</text>
   {''.join(pills)}
