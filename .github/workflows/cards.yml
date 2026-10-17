@@ -1,4 +1,4 @@
-name: Update place cards
+name: Update live cards
 
 on:
   schedule:
@@ -25,7 +25,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: python build.py places
+      - run: python build.py live
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       # Branche orpheline à un seul commit, écrasée à chaque passage
       - name: Publish to the cards branch
@@ -35,5 +37,5 @@ jobs:
           git add .
           git -c user.name="github-actions[bot]" \
               -c user.email="41898099+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "Update place cards"
+              commit -q -m "Update live cards"
           git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" cards

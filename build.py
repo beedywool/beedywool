@@ -5,8 +5,11 @@ Modifie les valeurs ci-dessous puis lance :  python3 build.py
 """
 import base64
 import colorsys
+import json
 import math
+import os
 import re
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime
@@ -125,6 +128,8 @@ OUT = Path(__file__).parent / "assets"
 ICONS = Path(__file__).parent / "icons"
 # Cartes « lieux » : regénérées toutes les 30 min par la GitHub Action
 CARDS = Path(__file__).parent / "cards"
+# Largeur commune de toutes les images, et espace entre deux cartes
+W, GAP = 1000, 12
 # Certaines icônes (ex. Playwright) ont disparu des versions récentes
 ICON_SOURCES = ["13.21.0", "9.21.0"]
 
@@ -186,7 +191,8 @@ def text_width(s, size):
 
 
 def header(c):
-    w, h = 900, 300
+    w, h = W, 300
+    dx = W - 900
     pills, x = [], 48
     fills = [(c["pc"], c["on_pc"]), (c["secc"], c["on_secc"]), (c["tc"], c["on_tc"])]
     for i, label in enumerate(PILLS):
@@ -205,13 +211,13 @@ def header(c):
 <defs><clipPath id="card"><rect width="{w}" height="{h}" rx="36"/></clipPath></defs>
 <g clip-path="url(#card)">
   <rect width="{w}" height="{h}" fill="#{c['sc']}"/>
-  <path class="spin" d="{shape('cookie', 705, 135, 118)}" fill="#{c['pc']}"/>
-  <text x="705" y="152" font-size="52" font-weight="500" text-anchor="middle" fill="#{c['on_pc']}"
+  <path class="spin" d="{shape('cookie', 705 + dx, 135, 118)}" fill="#{c['pc']}"/>
+  <text x="{705 + dx}" y="152" font-size="52" font-weight="500" text-anchor="middle" fill="#{c['on_pc']}"
         style="font-family:'JetBrains Mono','Fira Code',ui-monospace,monospace">&lt;/&gt;</text>
-  <path class="spinr" d="{shape('clover', 845, 262, 78)}" fill="#{c['tc']}"/>
-  <path class="spin" d="{shape('sunny', 585, 262, 38)}" fill="#{c['secc']}"/>
-  <g class="float"><circle cx="840" cy="52" r="14" fill="#{c['primary']}"/></g>
-  <rect x="530" y="22" width="88" height="34" rx="17" fill="#{c['outline_v']}" transform="rotate(-24 574 39)"/>
+  <path class="spinr" d="{shape('clover', 845 + dx, 262, 78)}" fill="#{c['tc']}"/>
+  <path class="spin" d="{shape('sunny', 585 + dx, 262, 38)}" fill="#{c['secc']}"/>
+  <g class="float"><circle cx="{840 + dx}" cy="52" r="14" fill="#{c['primary']}"/></g>
+  <rect x="{530 + dx}" y="22" width="88" height="34" rx="17" fill="#{c['outline_v']}" transform="rotate(-24 {574 + dx} 39)"/>
 </g>
 <g class="fade">
   <rect x="48" y="44" width="{chip_w:.0f}" height="32" rx="8" fill="none" stroke="#{c['outline']}"/>
@@ -225,14 +231,16 @@ def header(c):
 
 
 def section(c, key, title, kind, index):
-    w, h = 900, 72
+    w, h, top = W, 72 + 28, 28
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
 <title>{escape(title)}</title>
 {base_style(c)}
+<g transform="translate(0 {top})">
 <path class="spin" d="{shape(kind, 36, 36, 30)}" fill="#{c['pc']}"/>
 <text x="36" y="42" font-size="16" font-weight="600" text-anchor="middle" fill="#{c['on_pc']}">{index:02d}</text>
 <text x="84" y="46" font-size="30" font-weight="500" fill="#{c['on_surface']}">{escape(title)}</text>
-<rect x="{108 + text_width(title, 30):.0f}" y="35" width="{max(0, 880 - 108 - text_width(title, 30)):.0f}" height="2" rx="1" fill="#{c['outline_v']}"/>
+<rect x="{108 + text_width(title, 30):.0f}" y="35" width="{max(0, w - 108 - text_width(title, 30)):.0f}" height="2" rx="1" fill="#{c['outline_v']}"/>
+</g>
 </svg>
 """
 
@@ -250,12 +258,13 @@ def wrap(s, n, max_lines=3):
 
 
 def about(c):
-    cols, gap, cw, ch = 3, 12, 292, 208
+    cols, gap, ch = 3, GAP, 208
+    cw = (W - (cols - 1) * gap) / cols
     rows = math.ceil(len(ABOUT) / cols)
-    bio = wrap(BIO, 60, 6)
+    bio = wrap(BIO, 68, 6)
     bh = 92 + 32 * len(bio)
     top = bh + gap
-    w, h = 900, top + rows * ch + (rows - 1) * gap
+    w, h = W, top + rows * ch + (rows - 1) * gap
     tones = [("pc", "on_pc"), ("secc", "on_secc"), ("tc", "on_tc")]
     kinds = ["cookie", "clover", "sunny", "flower"]
     cards = []
@@ -264,7 +273,7 @@ def about(c):
         bg, _ = tones[i % 3]
         lines = "".join(
             f'<tspan x="{x + 24}" dy="{0 if j == 0 else 28}">{escape(l)}</tspan>'
-            for j, l in enumerate(wrap(value, 22))
+            for j, l in enumerate(wrap(value, 25))
         )
         cards.append(f"""<g class="fade" style="animation-delay:{i * 90}ms">
   <rect x="{x}" y="{y}" width="{cw}" height="{ch}" rx="24" fill="#{c['sc']}"/>
@@ -278,8 +287,8 @@ def about(c):
 <defs><clipPath id="bio"><rect width="{w}" height="{bh}" rx="28"/></clipPath></defs>
 <g class="fade" clip-path="url(#bio)">
   <rect width="{w}" height="{bh}" fill="#{c['sc']}"/>
-  <path class="spin" d="{shape('flower', 830, bh - 10, 120)}" fill="#{c['pc']}"/>
-  <path class="spinr" d="{shape('cookie', 712, 26, 38)}" fill="#{c['tc']}"/>
+  <path class="spin" d="{shape('flower', W - 70, bh - 10, 120)}" fill="#{c['pc']}"/>
+  <path class="spinr" d="{shape('cookie', W - 188, 26, 38)}" fill="#{c['tc']}"/>
   <text x="28" y="50" font-size="17" font-weight="500" fill="#{c['primary']}">Hi, I'm {escape(NAME)}</text>
   <text x="28" y="94" font-size="22" fill="#{c['on_surface']}">{"".join(f'<tspan x="28" dy="{0 if j == 0 else 32}">{escape(l)}</tspan>' for j, l in enumerate(bio))}</text>
 </g>
@@ -335,7 +344,8 @@ def legible(hex_, bg, target=3.0):
 
 
 def stack(c):
-    cols, gap, cw, pad = 2, 12, 444, 22
+    cols, gap, pad = 2, GAP, 22
+    cw = (W - gap) / cols
     chip_h, chip_gap, top = 40, 10, 66
     cards, heights = [], []
     for name, items in STACK.items():
@@ -371,7 +381,7 @@ def stack(c):
   {''.join(chips)}
 </g>""")
     h = sum(row_h) + (rows - 1) * gap
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="{h}" viewBox="0 0 900 {h}" role="img">
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" role="img">
 <title>Tech stack</title>
 {base_style(c)}
 {''.join(out)}
@@ -394,10 +404,11 @@ def icon(name, x, y, size, fill):
 
 
 def song(c):
-    w, h = 900, 232
+    w, h = W, 232
+    dx = W - 900
     cover = base64.b64encode((Path(__file__).parent / SONG["cover"]).read_bytes()).decode()
     img = f"data:image/jpeg;base64,{cover}"
-    x0, y0, prog_w, played = 232, 186, 444, .55
+    x0, y0, prog_w, played = 232, 186, 444 + dx, .55
     amp, wl = 3.5, 24
     wave = " L".join(
         f"{x:.1f},{amp * math.sin(2 * math.pi * x / wl):.2f}"
@@ -419,7 +430,7 @@ def song(c):
   <filter id="blur" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="36"/></filter>
 </defs>
 <g clip-path="url(#card)">
-  <image href="{img}" x="-50" y="-334" width="1000" height="1000" filter="url(#blur)" preserveAspectRatio="xMidYMid slice"/>
+  <image href="{img}" x="-50" y="{-(w + 100 - h) / 2:.0f}" width="{w + 100}" height="{w + 100}" filter="url(#blur)" preserveAspectRatio="xMidYMid slice"/>
   <rect width="{w}" height="{h}" fill="#{c['sc']}" opacity=".8"/>
 </g>
 <image href="{img}" x="24" y="24" width="184" height="184" clip-path="url(#art)" preserveAspectRatio="xMidYMid slice"/>
@@ -434,13 +445,13 @@ def song(c):
     <rect x="{px + 10:.0f}" y="-2" width="{prog_w - px - 10:.0f}" height="4" rx="2" fill="#{c['outline_v']}"/>
     <rect x="{px - 1:.0f}" y="-11" width="4" height="22" rx="2" fill="#{c['primary']}"/>
   </g>
-  {icon('prev', 712, 100, 32, c['on_surface'])}
-  <rect x="764" y="80" width="72" height="72" rx="24" fill="#{c['primary']}"/>
-  {icon('pause', 784, 100, 32, on_p)}
-  {icon('next', 852, 100, 32, c['on_surface'])}
-  <rect x="764.5" y="24.5" width="111" height="31" rx="8" fill="none" stroke="#{c['outline']}"/>
-  <path transform="translate(776 33) scale(.6)" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z" fill="#FF0033"/>
-  <text x="800" y="45" font-size="14" font-weight="500" fill="#{c['on_sv']}">YouTube</text>
+  {icon('prev', 712 + dx, 100, 32, c['on_surface'])}
+  <rect x="{764 + dx}" y="80" width="72" height="72" rx="24" fill="#{c['primary']}"/>
+  {icon('pause', 784 + dx, 100, 32, on_p)}
+  {icon('next', 852 + dx, 100, 32, c['on_surface'])}
+  <rect x="{764.5 + dx}" y="24.5" width="111" height="31" rx="8" fill="none" stroke="#{c['outline']}"/>
+  <path transform="translate({776 + dx} 33) scale(.6)" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z" fill="#FF0033"/>
+  <text x="{800 + dx}" y="45" font-size="14" font-weight="500" fill="#{c['on_sv']}">YouTube</text>
 </g>
 </svg>
 """
@@ -572,7 +583,7 @@ def landscape(pl, p, phase, w, sh):
 
 
 def place(c, pl, now=None):
-    w, h, sh = 444, 336, 210
+    w, h, sh = (W - GAP) / 2, 336, 210
     now = (now or datetime.now(ZoneInfo("UTC"))).astimezone(ZoneInfo(pl["tz"]))
     phase = phase_for(now.hour)
     p = PHASES[phase]
@@ -604,27 +615,226 @@ def place(c, pl, now=None):
 """
 
 
-def build_places():
+def places(c, now=None):
+    """Les deux cartes lieux côte à côte dans une seule image."""
+    pw, ph = (W - GAP) / 2, 336
+    parts = []
+    for i, pl in enumerate(PLACES):
+        inner = place(c, pl, now).split(">", 1)[1].rsplit("</svg>", 1)[0]
+        # ids préfixés pour éviter les collisions entre les deux cartes
+        inner = re.sub(r'id="([^"]+)"', rf'id="{pl["key"]}-\1"', inner)
+        inner = re.sub(r"url\(#([^)]+)\)", rf"url(#{pl['key']}-\1)", inner)
+        parts.append(f'<svg x="{i * (pw + GAP)}" width="{pw}" height="{ph}" viewBox="0 0 {pw} {ph}">{inner}</svg>')
+    title = " · ".join(f"{pl['label']}: {pl['city']}, {pl['country']}" for pl in PLACES)
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{ph}" viewBox="0 0 {W} {ph}" role="img">
+<title>{escape(title)}</title>
+{''.join(parts)}
+</svg>
+"""
+
+
+# ─── Statistiques GitHub (lues via l'API, regénérées par la GitHub Action) ───
+LOGIN = "beedywool"
+STATS_QUERY = """query($login: String!) {
+  user(login: $login) {
+    repositories(ownerAffiliations: OWNER, isFork: false, first: 100) {
+      totalCount
+      nodes {
+        stargazerCount
+        languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+          edges { size node { name color } }
+        }
+      }
+    }
+    pullRequests { totalCount }
+    contributionsCollection {
+      totalCommitContributions
+      restrictedContributionsCount
+      contributionCalendar {
+        totalContributions
+        weeks { contributionDays { contributionCount } }
+      }
+    }
+  }
+}"""
+
+
+def github_token():
+    if os.environ.get("GITHUB_TOKEN"):
+        return os.environ["GITHUB_TOKEN"]
+    try:
+        return subprocess.check_output(["gh", "auth", "token"], text=True).strip()
+    except (OSError, subprocess.CalledProcessError):
+        raise SystemExit("GITHUB_TOKEN manquant (ou connecte-toi avec `gh auth login`)")
+
+
+def fetch_stats():
+    req = urllib.request.Request(
+        "https://api.github.com/graphql",
+        data=json.dumps({"query": STATS_QUERY, "variables": {"login": LOGIN}}).encode(),
+        headers={"Authorization": f"bearer {github_token()}", "Content-Type": "application/json"},
+    )
+    data = json.load(urllib.request.urlopen(req, timeout=30))
+    if "errors" in data:
+        raise SystemExit(f"API GitHub : {data['errors']}")
+    u = data["data"]["user"]
+    repos = u["repositories"]
+    langs = {}
+    for r in repos["nodes"]:
+        for e in r["languages"]["edges"]:
+            name = e["node"]["name"]
+            size, color = langs.get(name, (0, e["node"]["color"]))
+            langs[name] = (size + e["size"], color or "938F99")
+    cc = u["contributionsCollection"]
+    days = [d["contributionCount"] for wk in cc["contributionCalendar"]["weeks"] for d in wk["contributionDays"]]
+    return dict(
+        stars=sum(r["stargazerCount"] for r in repos["nodes"]),
+        repos=repos["totalCount"],
+        prs=u["pullRequests"]["totalCount"],
+        commits=cc["totalCommitContributions"] + cc["restrictedContributionsCount"],
+        total=cc["contributionCalendar"]["totalContributions"],
+        weeks=[[d["contributionCount"] for d in wk["contributionDays"]] for wk in cc["contributionCalendar"]["weeks"]],
+        days=days,
+        langs=sorted(langs.items(), key=lambda kv: -kv[1][0]),
+    )
+
+
+def streaks(days):
+    longest = run = 0
+    for n in days:
+        run = run + 1 if n else 0
+        longest = max(longest, run)
+    current, tail = 0, days[:-1] if days and not days[-1] else days  # aujourd'hui pas encore compté
+    for n in reversed(tail):
+        if not n:
+            break
+        current += 1
+    return current, longest
+
+
+def fmt(n):
+    return f"{n / 1000:.1f}k".replace(".0k", "k") if n >= 10000 else f"{n:,}".replace(",", " ")
+
+
+def mix(a, b, t):
+    pa = [int(a[i:i + 2], 16) for i in (0, 2, 4)]
+    pb = [int(b[i:i + 2], 16) for i in (0, 2, 4)]
+    return "".join(f"{round(x + (y - x) * t):02X}" for x, y in zip(pa, pb))
+
+
+def stats(c, st):
+    tones = ["pc", "secc", "tc", "pc"]
+    kinds = ["cookie", "clover", "sunny", "flower"]
+    # Ligne 1 : tuiles chiffrées
+    tiles = [("Stars earned", st["stars"]), ("Commits · 1 year", st["commits"]),
+             ("Pull requests", st["prs"]), ("Repositories", st["repos"])]
+    tw, th = (W - 3 * GAP) / 4, 116
+    out = []
+    for i, (label, value) in enumerate(tiles):
+        x = i * (tw + GAP)
+        out.append(f"""<g class="fade" style="animation-delay:{i * 70}ms">
+  <rect x="{x}" y="0" width="{tw}" height="{th}" rx="24" fill="#{c['sc']}"/>
+  <path d="{shape(kinds[i], x + 36, 38, 14)}" fill="#{c[tones[i]]}"/>
+  <text x="{x + 60}" y="43" font-size="15" font-weight="500" fill="#{c['on_sv']}">{label}</text>
+  <text x="{x + 24}" y="94" font-size="36" font-weight="500" fill="#{c['on_surface']}">{fmt(value)}</text>
+</g>""")
+
+    # Ligne 2 : série + langages
+    y2, cw, ch = th + GAP, (W - GAP) / 2, 220
+    cur, longest = streaks(st["days"])
+    out.append(f"""<g class="fade" style="animation-delay:280ms" transform="translate(0 {y2})">
+  <rect width="{cw}" height="{ch}" rx="24" fill="#{c['sc']}"/>
+  <path class="spin" d="{shape('sunny', 112, 118, 66)}" fill="#{c['pc']}"/>
+  <text x="112" y="126" font-size="44" font-weight="500" text-anchor="middle" fill="#{c['on_pc']}">{cur}</text>
+  <text x="112" y="150" font-size="14" font-weight="500" text-anchor="middle" fill="#{c['on_pc']}">day{'s' if cur != 1 else ''}</text>
+  <text x="216" y="58" font-size="17" font-weight="500" fill="#{c['primary']}">Current streak</text>
+  <text x="216" y="104" font-size="15" fill="#{c['on_sv']}">Longest streak</text>
+  <text x="216" y="134" font-size="26" font-weight="500" fill="#{c['on_surface']}">{longest} day{'s' if longest != 1 else ''}</text>
+  <text x="216" y="168" font-size="15" fill="#{c['on_sv']}">Contributions · 1 year</text>
+  <text x="216" y="198" font-size="26" font-weight="500" fill="#{c['on_surface']}">{fmt(st['total'])}</text>
+</g>""")
+
+    top = st["langs"][:6]
+    total = sum(v[0] for _, v in st["langs"]) or 1
+    bar_w, bx, seg = cw - 48, 24, []
+    shown = sum(v[0] for _, v in top) or 1
+    for name, (size, color) in top:
+        sw = bar_w * size / shown
+        seg.append(f'<rect x="{bx:.1f}" y="66" width="{max(sw - 4, 2):.1f}" height="12" rx="6" fill="{escape(color)}"/>')
+        bx += sw
+    legend = []
+    for i, (name, (size, color)) in enumerate(top):
+        lx, ly = 24 + (i % 2) * (cw - 48) / 2, 120 + (i // 2) * 36
+        legend.append(f'<circle cx="{lx + 6}" cy="{ly - 5}" r="6" fill="{escape(color)}"/>'
+                      f'<text x="{lx + 20}" y="{ly}" font-size="16" fill="#{c["on_surface"]}">{escape(name)}</text>'
+                      f'<text x="{lx + (cw - 48) / 2 - 16}" y="{ly}" font-size="15" text-anchor="end" fill="#{c["on_sv"]}">{100 * size / total:.1f}%</text>')
+    out.append(f"""<g class="fade" style="animation-delay:350ms" transform="translate({cw + GAP} {y2})">
+  <rect width="{cw}" height="{ch}" rx="24" fill="#{c['sc']}"/>
+  <text x="24" y="44" font-size="17" font-weight="500" fill="#{c['primary']}">Top languages</text>
+  {''.join(seg)}{''.join(legend)}
+</g>""")
+
+    # Ligne 3 : calendrier de contributions
+    y3 = y2 + ch + GAP
+    weeks = st["weeks"][-53:]
+    cell_gap = 4
+    cell = (W - 48 - (len(weeks) - 1) * cell_gap) / len(weeks)
+    nonzero = sorted(n for wk in weeks for n in wk if n)
+    q = [nonzero[int(len(nonzero) * f)] if nonzero else 1 for f in (.25, .5, .75)]
+    levels = [c["sch"]] + [mix(c["pc"], c["primary"], t) for t in (0, .35, .7, 1)]
+    cells = []
+    for wi, wk in enumerate(weeks):
+        for di, n in enumerate(wk):
+            lvl = 0 if not n else 1 + sum(n > t for t in q)
+            cells.append(f'<rect x="{24 + wi * (cell + cell_gap):.1f}" y="{64 + di * (cell + cell_gap):.1f}" '
+                         f'width="{cell:.1f}" height="{cell:.1f}" rx="4" fill="#{levels[lvl]}"/>')
+    hh = 64 + 7 * cell + 6 * cell_gap + 24
+    out.append(f"""<g class="fade" style="animation-delay:420ms" transform="translate(0 {y3})">
+  <rect width="{W}" height="{hh:.0f}" rx="24" fill="#{c['sc']}"/>
+  <text x="24" y="44" font-size="17" font-weight="500" fill="#{c['primary']}">Contributions</text>
+  <text x="{W - 24}" y="44" font-size="15" text-anchor="end" fill="#{c['on_sv']}">{fmt(st['total'])} in the last year</text>
+  {''.join(cells)}
+</g>""")
+    h = y3 + hh
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h:.0f}" viewBox="0 0 {W} {h:.0f}" role="img">
+<title>GitHub stats — {st['stars']} stars, {st['commits']} commits, {st['prs']} pull requests, current streak {cur} days</title>
+{base_style(c)}
+{''.join(out)}
+</svg>
+"""
+
+
+def pad(svg):
+    """Ajoute l'espace commun sous chaque image : le README les empile sans marge."""
+    def grow(m):
+        h = float(m.group(2)) + GAP
+        return f'{m.group(1)}height="{h:g}" viewBox="0 0 {m.group(3)} {h:g}"'
+    return re.sub(r'(<svg xmlns[^>]*?)height="([\d.]+)" viewBox="0 0 ([\d.]+) [\d.]+"', grow, svg, count=1)
+
+
+def build_live():
+    """Cartes qui changent : lieux (heure) et stats GitHub."""
     CARDS.mkdir(exist_ok=True)
+    st = fetch_stats()
     for mode, c in SCHEMES.items():
-        for pl in PLACES:
-            (CARDS / f"{pl['key']}-{mode}.svg").write_text(place(c, pl))
-    print(f"Cartes lieux générées dans {CARDS}")
+        (CARDS / f"places-{mode}.svg").write_text(pad(places(c)))
+        (CARDS / f"stats-{mode}.svg").write_text(pad(stats(c, st)))
+    print(f"Cartes live générées dans {CARDS}")
 
 
 def main():
-    if sys.argv[1:] == ["places"]:
-        return build_places()
-    build_places()
+    if sys.argv[1:] == ["live"]:
+        return build_live()
+    build_live()
     OUT.mkdir(exist_ok=True)
     kinds = ["cookie", "clover", "sunny", "flower"]
     for mode, c in SCHEMES.items():
-        (OUT / f"header-{mode}.svg").write_text(header(c))
-        (OUT / f"about-{mode}.svg").write_text(about(c))
-        (OUT / f"stack-{mode}.svg").write_text(stack(c))
-        (OUT / f"song-{mode}.svg").write_text(song(c))
+        (OUT / f"header-{mode}.svg").write_text(pad(header(c)))
+        (OUT / f"about-{mode}.svg").write_text(pad(about(c)))
+        (OUT / f"stack-{mode}.svg").write_text(pad(stack(c)))
+        (OUT / f"song-{mode}.svg").write_text(pad(song(c)))
         for i, (key, title) in enumerate(SECTIONS.items()):
-            (OUT / f"section-{key}-{mode}.svg").write_text(section(c, key, title, kinds[i % 4], i + 1))
+            (OUT / f"section-{key}-{mode}.svg").write_text(pad(section(c, key, title, kinds[i % 4], i + 1)))
     print(f"SVG générés dans {OUT}")
 
 
