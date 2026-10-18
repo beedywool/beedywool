@@ -211,7 +211,7 @@ def header(c):
              f'<clipPath id="pride"><rect x="{px + 12}" y="52" width="24" height="16" rx="3"/></clipPath>'
              f'<g clip-path="url(#pride)">{stripes}</g>')
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
-<title>{escape(NAME)} — {escape(TAGLINE)}</title>
+<title>{escape(NAME)} | {escape(TAGLINE)}</title>
 {base_style(c)}
 <defs><clipPath id="card"><rect width="{w}" height="{h}" rx="36"/></clipPath></defs>
 <g clip-path="url(#card)">
@@ -365,6 +365,32 @@ def favorites(c):
 """
 
 
+def portfolio_link(c):
+    # Carte-bouton sous l'en-tête : le README ne peut pas avoir de vrai bouton, toute l'image est un lien
+    h, bh = 104, 56
+    site = PORTFOLIO.split("://", 1)[-1].rstrip("/")
+    label = "Visit portfolio"
+    bw = title_width(label, 17) + 24 + 26 + 24
+    bx, by = W - 24 - bw, (h - bh) / 2
+    on_p = c['pc'] if c is SCHEMES['dark'] else 'FFFFFF'
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" role="img">
+<title>Visit my portfolio: {escape(site)}</title>
+{base_style(c)}
+<defs><clipPath id="cta"><rect width="{W}" height="{h}" rx="28"/></clipPath></defs>
+<g class="fade" clip-path="url(#cta)">
+  <rect width="{W}" height="{h}" fill="#{c['sc']}"/>
+  <path class="spin" d="{shape('sunny', 52, 52, 26)}" fill="#{c['pc']}"/>
+  {icon('outward', 40, 40, 24, c['on_pc'])}
+  <text x="100" y="47" font-size="22" font-weight="500" fill="#{c['on_surface']}">Check out my portfolio</text>
+  <text x="100" y="74" font-size="16" fill="#{c['on_sv']}">More about me and my projects</text>
+  <rect x="{bx:.0f}" y="{by:.0f}" width="{bw:.0f}" height="{bh}" rx="28" fill="#{c['primary']}"/>
+  <text x="{bx + 24:.0f}" y="{by + 35:.0f}" font-size="17" font-weight="600" fill="#{on_p}">{escape(label)}</text>
+  {icon('outward', bx + bw - 24 - 22, by + 17, 22, on_p)}
+</g>
+</svg>
+"""
+
+
 def subsection(c, title, kind):
     # Titre de sous-partie, comme sur le portfolio : petite forme + titre, sans numéro ni trait
     w, h = W, 60
@@ -505,6 +531,7 @@ MI = dict(
     next="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z",
     pause="M6 19h4V5H6v14zm8-14v14h4V5h-4z",
     note="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+    outward="M6 6v2h8.59L5 17.59 6.41 19 16 9.41V18h2V6z",
     tv="M21 3H3c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.11-.9-2-2-2zm0 14H3V5h18v12z",
     gamepad="M21.58 16.09l-1.09-7.66A3.996 3.996 0 0 0 16.53 5H7.47C5.48 5 3.79 6.46 3.51 8.43l-1.09 7.66C2.2 17.63 3.39 19 4.94 19c.68 0 1.32-.27 1.8-.75L9 16h6l2.25 2.25c.48.48 1.13.75 1.8.75 1.56 0 2.75-1.37 2.53-2.91zM11 11H9v2H8v-2H6v-1h2V8h1v2h2v1zm4-1c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z",
     book="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z",
@@ -568,7 +595,7 @@ def song(c, info):
     px = prog_w * played
     on_p = c['pc'] if c is SCHEMES['dark'] else 'FFFFFF'
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
-<title>Favorite song — {escape(info['title'])} by {escape(info['artist'])}</title>
+<title>Favorite song: {escape(info['title'])} by {escape(info['artist'])}</title>
 {base_style(c)}
 <style>
   .wave {{ animation: wave 2.8s linear infinite; }}
@@ -758,7 +785,7 @@ def place(c, pl, now=None):
     chip = f"{pl['city']}, {pl['country']}"
     chip_w = title_width(chip, 15) + 50
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
-<title>{escape(pl['label'])}: {escape(chip)} — {now:%H:%M} ({utc})</title>
+<title>{escape(pl['label'])}: {escape(chip)}, {now:%H:%M} ({utc})</title>
 {base_style(c)}
 <defs><clipPath id="card"><rect width="{w}" height="{h}" rx="28"/></clipPath></defs>
 <g clip-path="url(#card)">
@@ -958,7 +985,7 @@ def stats(c, st):
 </g>""")
     h = y3 + hh
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h:.0f}" viewBox="0 0 {W} {h:.0f}" role="img">
-<title>GitHub stats — {st['stars']} stars, {st['commits']} commits, {st['prs']} pull requests, current streak {cur} days</title>
+<title>GitHub stats: {st['stars']} stars, {st['commits']} commits, {st['prs']} pull requests, current streak {cur} days</title>
 {base_style(c)}
 {''.join(out)}
 </svg>
@@ -986,7 +1013,7 @@ def build_live():
 # Le contenu vient du portfolio : son build publie profile.json à partir de
 # portfolio-config.json (modifiable avec Pages CMS). Les valeurs en haut du fichier
 # ne servent que de secours si le site est injoignable et sans copie en cache.
-PORTFOLIO = os.environ.get("PORTFOLIO_URL", "https://beedywool.com")
+PORTFOLIO = os.environ.get("PORTFOLIO_URL", "https://portfolio.mignon.casa")
 PRIDE = True
 TRAVEL = dict(intro="", been=[])
 FAVORITES = []
@@ -1064,11 +1091,12 @@ def write_readme(info):
     def live(name, alt):
         return pic(f"{cards}/{name}-dark.svg", f"{cards}/{name}-light.svg", alt)
 
-    song_alt = f"Favorite song — {info['title']} by {info['artist']}"
+    song_alt = f"Favorite song: {info['title']} by {info['artist']}"
     places_alt = " · ".join(f"{pl['label']}: {pl['city']}, {pl['country']}" for pl in PLACES)
     lines = [
-        f'<a href="{PORTFOLIO}">{asset("header", f"{NAME} — {TAGLINE}")}</a>',
-        asset("section-about", "01 — About me"),
+        f'<a href="{PORTFOLIO}">{asset("header", f"{NAME} | {TAGLINE}")}</a>',
+        f'<a href="{PORTFOLIO}">{asset("portfolio", "Visit my portfolio: " + PORTFOLIO.split("://", 1)[-1])}</a>',
+        asset("section-about", "01 | About me"),
         asset("sub-intro", "Introduction"),
         asset("bio", f"Hi, I'm {NAME}. {BIO}"),
         live("places", places_alt),
@@ -1084,9 +1112,9 @@ def write_readme(info):
         been = ", ".join(n for n, _ in TRAVEL["been"])
         lines += [asset("sub-hobby", "Hobby"), asset("hobby", f"Travel: {TRAVEL['intro']} Been to: {been}")]
     lines += [
-        asset("section-stats", "02 — GitHub stats"),
+        asset("section-stats", "02 | GitHub stats"),
         live("stats", "GitHub stats: stars, commits, pull requests, repositories, streak, top languages and contributions"),
-        asset("section-stack", "03 — Tech stack"),
+        asset("section-stack", "03 | Tech stack"),
         asset("stack", ", ".join(n for items in STACK.values() for n, _, _ in items)),
     ]
     (Path(__file__).parent / "README.md").write_text("<p>\n" + "\n".join(lines) + "\n</p>\n")
@@ -1105,6 +1133,7 @@ def main():
             "favorites": ("Favorites", "sunny"), "hobby": ("Hobby", "flower")}
     for mode, c in SCHEMES.items():
         (OUT / f"header-{mode}.svg").write_text(pad(header(c)))
+        (OUT / f"portfolio-{mode}.svg").write_text(pad(portfolio_link(c)))
         (OUT / f"bio-{mode}.svg").write_text(pad(bio(c)))
         (OUT / f"facts-{mode}.svg").write_text(pad(facts(c)))
         if TRAVEL["intro"]:
