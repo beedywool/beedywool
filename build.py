@@ -736,13 +736,21 @@ def image_mime(url):
     return {".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml"}.get(suffix, "image/jpeg")
 
 
-def flag_image(code, x, y, w, h):
-    # Pays non dessinés à la main : drapeau flag-icons (même source que le portfolio)
+def flag_image(code, x, y, w, h, uid):
+    # Pays non dessinés à la main : drapeau flag-icons (même source que le portfolio), intégré
+    # directement dans la carte. Une image SVG imbriquée dans le SVG ne s'affiche pas partout.
     data = cached_download(f"https://cdn.jsdelivr.net/npm/flag-icons@7.5.0/flags/4x3/{code.lower()}.svg")
-    if not data:
+    root = re.search(rb"<svg\b[^>]*>(.*)</svg>", data or b"", re.S)
+    if not root:
         return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="#888"/>'
-    return (f'<image href="data:image/svg+xml;base64,{base64.b64encode(data).decode()}" x="{x}" y="{y}" '
-            f'width="{w}" height="{h}" preserveAspectRatio="xMidYMid slice"/>')
+    view_box = re.search(rb'viewBox="([^"]+)"', data).group(1).decode()
+    inner = root.group(1).decode()
+    # Identifiants internes préfixés : deux drapeaux identiques ne doivent pas se marcher dessus
+    inner = re.sub(r'\bid="([^"]+)"', rf'id="{uid}-\1"', inner)
+    inner = re.sub(r'url\(#([^)]+)\)', rf'url(#{uid}-\1)', inner)
+    inner = re.sub(r'(href)="#([^"]+)"', rf'\1="#{uid}-\2"', inner)
+    return (f'<svg xmlns:xlink="http://www.w3.org/1999/xlink" x="{x}" y="{y}" width="{w}" height="{h}" '
+            f'viewBox="{view_box}" preserveAspectRatio="xMidYMid slice">{inner}</svg>')
 
 
 _flag_ids = iter(range(1, 10**6))
@@ -757,7 +765,7 @@ def flag(code, x, y, w=27, h=18):
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2}" r="{h * .2:.1f}" fill="none" stroke="#5B8C3A" stroke-width="1.2"/>'
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2 - .5}" r="{h * .11:.1f}" fill="#8C5A2B"/>',
     }
-    body = drawn[code]() if code in drawn else flag_image(code, x, y, w, h)
+    body = drawn[code]() if code in drawn else flag_image(code, x, y, w, h, fid)
     return (f'<clipPath id="{fid}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4"/></clipPath>'
             f'<g clip-path="url(#{fid})">{body}</g>'
             f'<rect x="{x + .5}" y="{y + .5}" width="{w - 1}" height="{h - 1}" rx="3.5" fill="none" stroke="#000" stroke-opacity=".15"/>')
