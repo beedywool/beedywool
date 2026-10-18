@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
+  # Envoyé après un déploiement du portfolio pour mettre le README à jour tout de suite
+  repository_dispatch:
+    types: [portfolio-updated]
   push:
     branches: [main]
     paths: [build.py]
@@ -25,9 +28,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: python build.py live
+      # Toutes les cartes, à partir des données du portfolio (profile.json)
+      - run: python build.py
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      # Cartes statiques + README : commit seulement si le contenu du portfolio a changé
+      - name: Commit README changes
+        run: |
+          git add README.md assets
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898099+github-actions[bot]@users.noreply.github.com" \
+                commit -q -m "Sync README with the portfolio"
+            git push -q
+          fi
 
       # Branche orpheline à un seul commit, écrasée à chaque passage
       - name: Publish to the cards branch

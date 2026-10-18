@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Génère les SVG Material 3 (thème clair + sombre) utilisés par le README.
 
-Modifie les valeurs ci-dessous puis lance :  python3 build.py
+Le contenu (nom, bio, chanson, lieux, stack…) vient du portfolio : modifie-le là-bas
+(Pages CMS), puis lance :  python3 build.py   (PORTFOLIO_URL=… pour tester un autre site)
 """
 import base64
 import colorsys
+import hashlib
 import json
 import math
 import os
@@ -18,7 +20,7 @@ from html import escape
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# ─── À personnaliser ─────────────────────────────────────────────────────────
+# ─── Valeurs de secours (le portfolio a la priorité, voir load_portfolio) ─────
 NAME = "beedywool"
 TAGLINE = "Full-stack developer"
 GREETING = "👋  Hello, world"
@@ -200,11 +202,14 @@ def header(c):
     # Les emoji sont plus larges que les lettres : environ 0,8 em
     chip_w = title_width(GREETING, 14) + 28 + sum(.2 * 14 for ch in GREETING if ord(ch) > 0xFFFF)
     px = 48 + chip_w + 8
-    pride_w = 12 + 24 + 12
+    pride_w = 12 + 24 + 12 if PRIDE else 0
     stripes = "".join(
         f'<rect x="{px + 12}" y="{52 + i * 16 / 6:.2f}" width="24" height="{16 / 6 + .3:.2f}" fill="#{col}"/>'
         for i, col in enumerate(["E40303", "FF8C00", "FFED00", "008026", "004CFF", "732982"])
     )
+    pride = (f'<rect x="{px}" y="44" width="{pride_w:.0f}" height="32" rx="8" fill="none" stroke="#{c["outline"]}"/>'
+             f'<clipPath id="pride"><rect x="{px + 12}" y="52" width="24" height="16" rx="3"/></clipPath>'
+             f'<g clip-path="url(#pride)">{stripes}</g>')
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
 <title>{escape(NAME)} — {escape(TAGLINE)}</title>
 {base_style(c)}
@@ -222,9 +227,7 @@ def header(c):
 <g class="fade">
   <rect x="48" y="44" width="{chip_w:.0f}" height="32" rx="8" fill="none" stroke="#{c['outline']}"/>
   <text x="62" y="65" font-size="14" font-weight="500" fill="#{c['on_sv']}">{escape(GREETING)}</text>
-  <rect x="{px}" y="44" width="{pride_w:.0f}" height="32" rx="8" fill="none" stroke="#{c['outline']}"/>
-  <clipPath id="pride"><rect x="{px + 12}" y="52" width="24" height="16" rx="3"/></clipPath>
-  <g clip-path="url(#pride)">{stripes}</g>
+  {pride if PRIDE else ''}
   <text x="44" y="158" font-size="68" font-weight="500" letter-spacing="-1" fill="#{c['on_surface']}">{escape(NAME)}</text>
   <text x="48" y="198" font-size="21" fill="#{c['on_sv']}">{escape(TAGLINE)}</text>
   {''.join(pills)}
@@ -260,19 +263,34 @@ def wrap(s, n, max_lines=3):
     return lines[:max_lines]
 
 
-def about(c):
+def bio(c):
+    lines = wrap(BIO, 68, 6)
+    w, h = W, 92 + 32 * len(lines)
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
+<title>Introduction</title>
+{base_style(c)}
+<defs><clipPath id="bio"><rect width="{w}" height="{h}" rx="28"/></clipPath></defs>
+<g class="fade" clip-path="url(#bio)">
+  <rect width="{w}" height="{h}" fill="#{c['sc']}"/>
+  <path class="spin" d="{shape('flower', W - 70, h - 10, 120)}" fill="#{c['pc']}"/>
+  <path class="spinr" d="{shape('cookie', W - 188, 26, 38)}" fill="#{c['tc']}"/>
+  <text x="28" y="50" font-size="17" font-weight="500" fill="#{c['primary']}">Hi, I'm {escape(NAME)}</text>
+  <text x="28" y="94" font-size="22" fill="#{c['on_surface']}">{"".join(f'<tspan x="28" dy="{0 if j == 0 else 32}">{escape(l)}</tspan>' for j, l in enumerate(lines))}</text>
+</g>
+</svg>
+"""
+
+
+def facts(c):
     cols, gap, ch = 3, GAP, 208
     cw = (W - (cols - 1) * gap) / cols
     rows = math.ceil(len(ABOUT) / cols)
-    bio = wrap(BIO, 68, 6)
-    bh = 92 + 32 * len(bio)
-    top = bh + gap
-    w, h = W, top + rows * ch + (rows - 1) * gap
+    w, h = W, rows * ch + (rows - 1) * gap
     tones = [("pc", "on_pc"), ("secc", "on_secc"), ("tc", "on_tc")]
     kinds = ["cookie", "clover", "sunny", "flower"]
     cards = []
     for i, (label, value) in enumerate(ABOUT):
-        x, y = (i % cols) * (cw + gap), top + (i // cols) * (ch + gap)
+        x, y = (i % cols) * (cw + gap), (i // cols) * (ch + gap)
         bg, _ = tones[i % 3]
         lines = "".join(
             f'<tspan x="{x + 24}" dy="{0 if j == 0 else 28}">{escape(l)}</tspan>'
@@ -285,17 +303,108 @@ def about(c):
   <text x="{x + 24}" y="{y + 144}" font-size="22" fill="#{c['on_surface']}">{lines}</text>
 </g>""")
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
-<title>About me</title>
+<title>Right now</title>
 {base_style(c)}
-<defs><clipPath id="bio"><rect width="{w}" height="{bh}" rx="28"/></clipPath></defs>
-<g class="fade" clip-path="url(#bio)">
-  <rect width="{w}" height="{bh}" fill="#{c['sc']}"/>
-  <path class="spin" d="{shape('flower', W - 70, bh - 10, 120)}" fill="#{c['pc']}"/>
-  <path class="spinr" d="{shape('cookie', W - 188, 26, 38)}" fill="#{c['tc']}"/>
-  <text x="28" y="50" font-size="17" font-weight="500" fill="#{c['primary']}">Hi, I'm {escape(NAME)}</text>
-  <text x="28" y="94" font-size="22" fill="#{c['on_surface']}">{"".join(f'<tspan x="28" dy="{0 if j == 0 else 32}">{escape(l)}</tspan>' for j, l in enumerate(bio))}</text>
-</g>
 {''.join(cards)}
+</svg>
+"""
+
+
+def favorites(c):
+    # Comme sur le portfolio : cartes côte à côte, 2 éléments + une tuile « +N » (le README
+    # ne peut pas se déplier, la carte entière mène à la section Favorites du portfolio)
+    shown, cols, pad, gap = 2, 2, 24, 12
+    cw = (W - (cols - 1) * GAP) / cols
+    tile_w = (cw - 2 * pad - 2 * gap) / 3
+    tile_h = tile_w * 4 / 3
+    card_h = 74 + tile_h + 44
+    on_p = c['pc'] if c is SCHEMES['dark'] else 'FFFFFF'
+    cards = []
+    for gi, group in enumerate(FAVORITES):
+        cx, cy = (gi % cols) * (cw + GAP), (gi // cols) * (card_h + GAP)
+        tiles = []
+        for i, item in enumerate(group["items"][:shown]):
+            x, y = pad + i * (tile_w + gap), 74
+            cid = f"fav{gi}-{i}"
+            raw = cached_download(item["image"]) if item.get("image") else None
+            if item.get("logo"):
+                bg, fit, inset = "FEF7FF", "xMidYMid meet", 14
+            else:
+                bg, fit, inset = c["sch"], "xMidYMid slice", 0
+            art = (f'<image href="data:image/webp;base64,{base64.b64encode(raw).decode()}" x="{x + inset:.1f}" y="{y + inset}" '
+                   f'width="{tile_w - 2 * inset:.1f}" height="{tile_h - 2 * inset:.1f}" preserveAspectRatio="{fit}"/>') if raw else ""
+            tiles.append(f"""<clipPath id="{cid}"><rect x="{x:.1f}" y="{y}" width="{tile_w:.1f}" height="{tile_h:.1f}" rx="16"/></clipPath>
+    <g clip-path="url(#{cid})"><rect x="{x:.1f}" y="{y}" width="{tile_w:.1f}" height="{tile_h:.1f}" fill="#{bg}"/>{art}</g>
+    <text x="{x:.1f}" y="{y + tile_h + 24:.1f}" font-size="15" font-weight="500" fill="#{c['on_surface']}">{escape(item['name'])}</text>""")
+        rest = len(group["items"]) - shown
+        if rest > 0:
+            x = pad + shown * (tile_w + gap)
+            tiles.append(f"""<rect x="{x:.1f}" y="74" width="{tile_w:.1f}" height="{tile_h:.1f}" rx="16" fill="#{c['secc']}"/>
+    <text x="{x + tile_w / 2:.1f}" y="{74 + tile_h / 2:.1f}" font-size="28" font-weight="500" text-anchor="middle" fill="#{c['on_secc']}">+{rest}</text>
+    <text x="{x + tile_w / 2:.1f}" y="{74 + tile_h / 2 + 26:.1f}" font-size="14" text-anchor="middle" fill="#{c['on_secc']}">Show all</text>""")
+        label_w = title_width(group["label"], 15) + 52
+        icon_name = group.get("icon") if group.get("icon") in MI else "note"
+        cards.append(f"""<g transform="translate({cx:.1f} {cy:.1f})" class="fade" style="animation-delay:{gi * 90}ms">
+  <clipPath id="favcard{gi}"><rect width="{cw:.1f}" height="{card_h:.1f}" rx="28"/></clipPath>
+  <g clip-path="url(#favcard{gi})">
+    <rect width="{cw:.1f}" height="{card_h:.1f}" fill="#{c['sc']}"/>
+    <path class="spin" d="{shape('flower' if gi % 2 == 0 else 'clover', cw - 30, 20, 58)}" fill="#{c['tc']}" opacity=".5"/>
+  </g>
+  <rect x="{pad}" y="22" width="{label_w:.0f}" height="34" rx="17" fill="#{c['primary']}"/>
+  {icon(icon_name, pad + 12, 30, 18, on_p)}
+  <text x="{pad + 36}" y="44" font-size="15" font-weight="600" fill="#{on_p}">{escape(group['label'])}</text>
+  {''.join(tiles)}
+</g>""")
+    rows = max(1, math.ceil(len(FAVORITES) / cols))
+    h = rows * card_h + (rows - 1) * GAP
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h:.0f}" viewBox="0 0 {W} {h:.0f}" role="img">
+<title>Favorites</title>
+{base_style(c)}
+{''.join(cards)}
+</svg>
+"""
+
+
+def subsection(c, title, kind):
+    # Titre de sous-partie, comme sur le portfolio : petite forme + titre, sans numéro ni trait
+    w, h = W, 60
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img">
+<title>{escape(title)}</title>
+{base_style(c)}
+<g class="fade">
+  <path d="{shape(kind, 14, 34, 13)}" fill="#{c['primary']}"/>
+  <text x="40" y="43" font-size="24" font-weight="500" fill="#{c['on_surface']}">{escape(title)}</text>
+</g>
+</svg>
+"""
+
+
+def hobby(c):
+    lines = wrap(TRAVEL["intro"], 74, 4)
+    pad_x, top = 124, 50
+    text_h = top + 44 + 30 * (len(lines) - 1)
+    chips, x, y, chip_h = [], pad_x, text_h + 28, 40
+    for name, code in TRAVEL["been"]:
+        cw = 12 + 27 + 10 + title_width(name, 15) + 16
+        if x + cw > W - 28:
+            x, y = pad_x, y + chip_h + 8
+        chips.append(f'<rect x="{x + .5:.1f}" y="{y + .5}" width="{cw - 1:.0f}" height="{chip_h - 1}" rx="8" fill="#{c["sc"]}" stroke="#{c["outline_v"]}"/>'
+                     f'{flag(code.upper(), x + 12, y + 11)}'
+                     f'<text x="{x + 49:.0f}" y="{y + 25}" font-size="15" font-weight="500" fill="#{c["on_surface"]}">{escape(name)}</text>')
+        x += cw + 8
+    h = (y + chip_h + 28) if chips else text_h + 30
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{h}" viewBox="0 0 {W} {h}" role="img">
+<title>Hobby: travel</title>
+{base_style(c)}
+<defs><clipPath id="hobby"><rect width="{W}" height="{h}" rx="28"/></clipPath></defs>
+<g class="fade" clip-path="url(#hobby)">
+  <rect width="{W}" height="{h}" fill="#{c['sc']}"/>
+  <path class="spin" d="{shape('flower', 64, 64, 36)}" fill="#{c['tc']}"/>
+  {icon('pin', 50, 50, 28, c['on_tc'])}
+  <text x="{pad_x}" y="{top}" font-size="17" font-weight="500" fill="#{c['primary']}">Travel</text>
+  <text x="{pad_x}" y="{top + 38}" font-size="20" fill="#{c['on_surface']}">{"".join(f'<tspan x="{pad_x}" dy="{0 if j == 0 else 30}">{escape(l)}</tspan>' for j, l in enumerate(lines))}</text>
+  <g style="font-family:inherit">{''.join(chips)}</g>
+</g>
 </svg>
 """
 
@@ -396,6 +505,10 @@ MI = dict(
     next="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z",
     pause="M6 19h4V5H6v14zm8-14v14h4V5h-4z",
     note="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+    tv="M21 3H3c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.11-.9-2-2-2zm0 14H3V5h18v12z",
+    gamepad="M21.58 16.09l-1.09-7.66A3.996 3.996 0 0 0 16.53 5H7.47C5.48 5 3.79 6.46 3.51 8.43l-1.09 7.66C2.2 17.63 3.39 19 4.94 19c.68 0 1.32-.27 1.8-.75L9 16h6l2.25 2.25c.48.48 1.13.75 1.8.75 1.56 0 2.75-1.37 2.53-2.91zM11 11H9v2H8v-2H6v-1h2V8h1v2h2v1zm4-1c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z",
+    book="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z",
+    movie="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z",
 )
 
 
@@ -433,16 +546,6 @@ def song_info():
         cover=base64.b64encode(cover_file.read_bytes()).decode(),
         letterbox=meta["letterbox"],
     )
-
-
-def sync_readme(info):
-    readme = Path(__file__).parent / "README.md"
-    alt = escape(f"Favorite song — {info['title']} by {info['artist']}")
-    text = re.sub(
-        r'<a href="[^"]*">(<picture><source media="\(prefers-color-scheme: dark\)" srcset="assets/song-dark.svg">'
-        r'<img align="top" width="100%" )alt="[^"]*"',
-        lambda m: f'<a href="{info["url"]}">{m.group(1)}alt="{alt}"', readme.read_text())
-    readme.write_text(text)
 
 
 def song(c, info):
@@ -600,13 +703,23 @@ def tricolor(x, y, w, h, colors):
                    for i, col in enumerate(colors))
 
 
+def flag_image(code, x, y, w, h):
+    # Pays non dessinés à la main : drapeau flag-icons (même source que le portfolio)
+    data = cached_download(f"https://cdn.jsdelivr.net/npm/flag-icons@7.5.0/flags/4x3/{code.lower()}.svg")
+    if not data:
+        return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="#888"/>'
+    return (f'<image href="data:image/svg+xml;base64,{base64.b64encode(data).decode()}" x="{x}" y="{y}" '
+            f'width="{w}" height="{h}" preserveAspectRatio="xMidYMid slice"/>')
+
+
 def flag(code, x, y, w=27, h=18):
-    body = {
-        "FR": tricolor(x, y, w, h, ["002654", "FFFFFF", "ED2939"]),
-        "MX": tricolor(x, y, w, h, ["006847", "FFFFFF", "CE1126"])
+    drawn = {
+        "FR": lambda: tricolor(x, y, w, h, ["002654", "FFFFFF", "ED2939"]),
+        "MX": lambda: tricolor(x, y, w, h, ["006847", "FFFFFF", "CE1126"])
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2}" r="{h * .2:.1f}" fill="none" stroke="#5B8C3A" stroke-width="1.2"/>'
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2 - .5}" r="{h * .11:.1f}" fill="#8C5A2B"/>',
-    }[code]
+    }
+    body = drawn[code]() if code in drawn else flag_image(code, x, y, w, h)
     return (f'<clipPath id="flag{code}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4"/></clipPath>'
             f'<g clip-path="url(#flag{code})">{body}</g>'
             f'<rect x="{x + .5}" y="{y + .5}" width="{w - 1}" height="{h - 1}" rx="3.5" fill="none" stroke="#000" stroke-opacity=".15"/>')
@@ -616,11 +729,20 @@ PHOTO_TINT = {"day": ("000000", 0), "golden": ("FF8A3D", .18), "night": ("0B1033
 
 
 def landscape(pl, p, phase, w, sh):
-    if not pl.get("photo"):
-        return f'<svg width="{w}" height="{sh}" viewBox="0 0 {w} {sh}">{sky(p, w, sh, phase)}{SCENES[pl["scene"]](p, w, sh)}</svg>'
-    path = Path(__file__).parent / pl["photo"]
-    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
-    data = base64.b64encode(path.read_bytes()).decode()
+    photo = pl.get("photo")
+    raw = None
+    if photo:
+        raw = cached_download(photo) if photo.startswith("http") else (Path(__file__).parent / photo).read_bytes()
+    local = Path(__file__).parent / "assets" / f"{pl['city'].lower()}.jpg"
+    if not raw and local.exists():
+        # Portfolio injoignable : photo du dépôt si elle existe
+        photo, raw = str(local), local.read_bytes()
+    if not raw:
+        scene = SCENES[pl["scene"]](p, w, sh) if pl.get("scene") in SCENES else ""
+        return f'<svg width="{w}" height="{sh}" viewBox="0 0 {w} {sh}">{sky(p, w, sh, phase)}{scene}</svg>'
+    suffix = Path(urllib.parse.urlparse(photo).path).suffix.lower()
+    mime = {".png": "image/png", ".webp": "image/webp"}.get(suffix, "image/jpeg")
+    data = base64.b64encode(raw).decode()
     tint, alpha = PHOTO_TINT[phase]
     return (f'<image href="data:{mime};base64,{data}" width="{w}" height="{sh}" preserveAspectRatio="xMidYMid slice"/>'
             f'<rect width="{w}" height="{sh}" fill="#{tint}" opacity="{alpha}"/>')
@@ -860,17 +982,137 @@ def build_live():
     print(f"Cartes live générées dans {CARDS}")
 
 
+# ─── Données du portfolio ────────────────────────────────────────────────────
+# Le contenu vient du portfolio : son build publie profile.json à partir de
+# portfolio-config.json (modifiable avec Pages CMS). Les valeurs en haut du fichier
+# ne servent que de secours si le site est injoignable et sans copie en cache.
+PORTFOLIO = os.environ.get("PORTFOLIO_URL", "https://beedywool.com")
+PRIDE = True
+TRAVEL = dict(intro="", been=[])
+FAVORITES = []
+
+
+def cached_download(url):
+    CACHE.mkdir(exist_ok=True)
+    cached = CACHE / f"dl-{hashlib.sha1(url.encode()).hexdigest()[:16]}"
+    if not cached.exists():
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "beedywool-readme"})
+            res = urllib.request.urlopen(req, timeout=20)
+            # Un site en mode SPA renvoie sa page HTML (200) pour les fichiers absents
+            if res.headers.get_content_type() == "text/html":
+                return None
+            cached.write_bytes(res.read())
+        except OSError:
+            return None
+    return cached.read_bytes()
+
+
+def load_portfolio():
+    global NAME, TAGLINE, GREETING, PILLS, PRIDE, BIO, ABOUT, SONG, PLACES, STACK, PORTFOLIO, TRAVEL, FAVORITES
+    cached = CACHE / "profile.json"
+    try:
+        req = urllib.request.Request(f"{PORTFOLIO}/profile.json", headers={"User-Agent": "beedywool-readme"})
+        data = json.load(urllib.request.urlopen(req, timeout=20))
+        CACHE.mkdir(exist_ok=True)
+        cached.write_text(json.dumps(data))
+    except (OSError, ValueError) as e:
+        if not cached.exists():
+            print(f"Portfolio injoignable ({e}) : valeurs par défaut de build.py")
+            return
+        print(f"Portfolio injoignable ({e}) : dernière copie en cache")
+        data = json.loads(cached.read_text())
+
+    site = data.get("site") or PORTFOLIO
+    if site != PORTFOLIO:
+        # PORTFOLIO_URL=… (test d'un autre build) : images prises sur ce site, liens vers le site public
+        data = json.loads(json.dumps(data).replace(site, PORTFOLIO))
+    PORTFOLIO = site
+    NAME, TAGLINE = data["name"], data["title"]
+    GREETING, PILLS, PRIDE = data["greeting"], data["tags"], bool(data.get("prideFlag"))
+    BIO = data["bio"]
+    ABOUT = [(f["label"], f["value"]) for f in data["facts"]]
+    if data.get("song"):
+        SONG = {k: data["song"].get(k, "") for k in ("url", "title", "artist", "album")}
+    PLACES = [
+        dict(key=f"place{i}", label=p["label"], city=p["city"], country=p["country"], tz=p["timezone"],
+             scene=p["city"].lower() if p["city"].lower() in SCENES else None,
+             photo=p.get("photo"), flag=p["code"].upper())
+        for i, p in enumerate(data["places"])
+    ]
+    STACK = {g["category"]: [(s["name"], s["icon"], s["color"].lstrip("#")) for s in g["items"]]
+             for g in data["stack"]}
+    FAVORITES = data.get("favorites") or []
+    travel = data.get("travel") or {}
+    TRAVEL = dict(intro=travel.get("intro", ""),
+                  been=[(p["city"], p["code"]) for p in travel.get("places", [])]
+                  + [(p["name"], p["code"]) for p in travel.get("countries", [])])
+
+
+def write_readme(info):
+    # Le README est entièrement généré : même structure que la section About du portfolio
+    cards = "https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards"
+
+    def pic(dark, light, alt):
+        alt = escape(alt, quote=False).replace('"', "&quot;")
+        return (f'<picture><source media="(prefers-color-scheme: dark)" srcset="{dark}">'
+                f'<img align="top" width="100%" alt="{alt}" src="{light}"></picture>')
+
+    def asset(name, alt):
+        return pic(f"assets/{name}-dark.svg", f"assets/{name}-light.svg", alt)
+
+    def live(name, alt):
+        return pic(f"{cards}/{name}-dark.svg", f"{cards}/{name}-light.svg", alt)
+
+    song_alt = f"Favorite song — {info['title']} by {info['artist']}"
+    places_alt = " · ".join(f"{pl['label']}: {pl['city']}, {pl['country']}" for pl in PLACES)
+    lines = [
+        f'<a href="{PORTFOLIO}">{asset("header", f"{NAME} — {TAGLINE}")}</a>',
+        asset("section-about", "01 — About me"),
+        asset("sub-intro", "Introduction"),
+        asset("bio", f"Hi, I'm {NAME}. {BIO}"),
+        live("places", places_alt),
+        asset("sub-now", "Right now"),
+        asset("facts", " · ".join(f"{l}: {v}" for l, v in ABOUT)),
+        asset("sub-favorites", "Favorites"),
+        f'<a href="{info["url"]}">{asset("song", song_alt)}</a>',
+    ]
+    if FAVORITES:
+        fav_alt = " · ".join(f"{g['label']}: " + ", ".join(i["name"] for i in g["items"]) for g in FAVORITES)
+        lines.append(f'<a href="{PORTFOLIO}/#h-favorites">{asset("favorites", fav_alt)}</a>')
+    if TRAVEL["intro"]:
+        been = ", ".join(n for n, _ in TRAVEL["been"])
+        lines += [asset("sub-hobby", "Hobby"), asset("hobby", f"Travel: {TRAVEL['intro']} Been to: {been}")]
+    lines += [
+        asset("section-stats", "02 — GitHub stats"),
+        live("stats", "GitHub stats: stars, commits, pull requests, repositories, streak, top languages and contributions"),
+        asset("section-stack", "03 — Tech stack"),
+        asset("stack", ", ".join(n for items in STACK.values() for n, _, _ in items)),
+    ]
+    (Path(__file__).parent / "README.md").write_text("<p>\n" + "\n".join(lines) + "\n</p>\n")
+
+
 def main():
+    load_portfolio()
     if sys.argv[1:] == ["live"]:
         return build_live()
     build_live()
     OUT.mkdir(exist_ok=True)
     kinds = ["cookie", "clover", "sunny", "flower"]
     info = song_info()
-    sync_readme(info)
+    write_readme(info)
+    subs = {"intro": ("Introduction", "cookie"), "now": ("Right now", "clover"),
+            "favorites": ("Favorites", "sunny"), "hobby": ("Hobby", "flower")}
     for mode, c in SCHEMES.items():
         (OUT / f"header-{mode}.svg").write_text(pad(header(c)))
-        (OUT / f"about-{mode}.svg").write_text(pad(about(c)))
+        (OUT / f"bio-{mode}.svg").write_text(pad(bio(c)))
+        (OUT / f"facts-{mode}.svg").write_text(pad(facts(c)))
+        if TRAVEL["intro"]:
+            (OUT / f"hobby-{mode}.svg").write_text(pad(hobby(c)))
+        if FAVORITES:
+            (OUT / f"favorites-{mode}.svg").write_text(pad(favorites(c)))
+        for key, (title, kind) in subs.items():
+            (OUT / f"sub-{key}-{mode}.svg").write_text(pad(subsection(c, title, kind)))
         (OUT / f"stack-{mode}.svg").write_text(pad(stack(c)))
         (OUT / f"song-{mode}.svg").write_text(pad(song(c, info)))
         for i, (key, title) in enumerate(SECTIONS.items()):
