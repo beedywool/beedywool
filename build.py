@@ -331,7 +331,7 @@ def favorites(c):
                 bg, fit, inset = "FEF7FF", "xMidYMid meet", 14
             else:
                 bg, fit, inset = c["sch"], "xMidYMid slice", 0
-            art = (f'<image href="data:image/webp;base64,{base64.b64encode(raw).decode()}" x="{x + inset:.1f}" y="{y + inset}" '
+            art = (f'<image href="data:{image_mime(item["image"])};base64,{base64.b64encode(raw).decode()}" x="{x + inset:.1f}" y="{y + inset}" '
                    f'width="{tile_w - 2 * inset:.1f}" height="{tile_h - 2 * inset:.1f}" preserveAspectRatio="{fit}"/>') if raw else ""
             tiles.append(f"""<clipPath id="{cid}"><rect x="{x:.1f}" y="{y}" width="{tile_w:.1f}" height="{tile_h:.1f}" rx="16"/></clipPath>
     <g clip-path="url(#{cid})"><rect x="{x:.1f}" y="{y}" width="{tile_w:.1f}" height="{tile_h:.1f}" fill="#{bg}"/>{art}</g>
@@ -730,6 +730,12 @@ def tricolor(x, y, w, h, colors):
                    for i, col in enumerate(colors))
 
 
+def image_mime(url):
+    # GitHub n'affiche pas le WebP intégré dans un SVG : le portfolio fournit du JPEG/PNG pour le README
+    suffix = Path(urllib.parse.urlparse(url).path).suffix.lower()
+    return {".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml"}.get(suffix, "image/jpeg")
+
+
 def flag_image(code, x, y, w, h):
     # Pays non dessinés à la main : drapeau flag-icons (même source que le portfolio)
     data = cached_download(f"https://cdn.jsdelivr.net/npm/flag-icons@7.5.0/flags/4x3/{code.lower()}.svg")
@@ -739,7 +745,12 @@ def flag_image(code, x, y, w, h):
             f'width="{w}" height="{h}" preserveAspectRatio="xMidYMid slice"/>')
 
 
+_flag_ids = iter(range(1, 10**6))
+
+
 def flag(code, x, y, w=27, h=18):
+    # Identifiant unique : deux fois le même pays (Bilbao et Madrid…) partageraient sinon la même découpe
+    fid = f"flag{code}{next(_flag_ids)}"
     drawn = {
         "FR": lambda: tricolor(x, y, w, h, ["002654", "FFFFFF", "ED2939"]),
         "MX": lambda: tricolor(x, y, w, h, ["006847", "FFFFFF", "CE1126"])
@@ -747,8 +758,8 @@ def flag(code, x, y, w=27, h=18):
               + f'<circle cx="{x + w / 2}" cy="{y + h / 2 - .5}" r="{h * .11:.1f}" fill="#8C5A2B"/>',
     }
     body = drawn[code]() if code in drawn else flag_image(code, x, y, w, h)
-    return (f'<clipPath id="flag{code}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4"/></clipPath>'
-            f'<g clip-path="url(#flag{code})">{body}</g>'
+    return (f'<clipPath id="{fid}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4"/></clipPath>'
+            f'<g clip-path="url(#{fid})">{body}</g>'
             f'<rect x="{x + .5}" y="{y + .5}" width="{w - 1}" height="{h - 1}" rx="3.5" fill="none" stroke="#000" stroke-opacity=".15"/>')
 
 
