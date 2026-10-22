@@ -1100,11 +1100,9 @@ def write_readme(info):
     cards = "https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards"
 
     def pic(dark, light, alt):
-        # GitHub ne résout plus <picture> d'après son thème (il suit celui de l'OS), donc chaque
-        # variante est un <img> avec le fragment que GitHub masque selon le thème du site.
         alt = escape(alt, quote=False).replace('"', "&quot;")
-        return (f'<img align="top" width="100%" alt="{alt}" src="{light}#gh-light-mode-only">\n'
-                f'<img align="top" width="100%" alt="{alt}" src="{dark}#gh-dark-mode-only">')
+        return (f'<picture><source media="(prefers-color-scheme: dark)" srcset="{dark}">'
+                f'<img align="top" width="100%" alt="{alt}" src="{light}"></picture>')
 
     def asset(name, alt):
         return pic(f"assets/{name}-dark.svg", f"assets/{name}-light.svg", alt)
