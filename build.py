@@ -1101,8 +1101,9 @@ def write_readme(info):
 
     def pic(dark, light, alt):
         alt = escape(alt, quote=False).replace('"', "&quot;")
-        return (f'<picture><source media="(prefers-color-scheme: dark)" srcset="{dark}">'
-                f'<img align="top" width="100%" alt="{alt}" src="{light}"></picture>')
+        # Les fragments #gh-*-mode-only suivent le thème choisi sur GitHub ; <picture> suivrait celui de l'appareil
+        return (f'<img align="top" width="100%" alt="{alt}" src="{light}#gh-light-mode-only">'
+                f'<img align="top" width="100%" alt="{alt}" src="{dark}#gh-dark-mode-only">')
 
     def asset(name, alt):
         return pic(f"assets/{name}-dark.svg", f"assets/{name}-light.svg", alt)
