@@ -1099,14 +1099,19 @@ def write_readme(info):
     # Le README est entièrement généré : même structure que la section About du portfolio
     cards = "https://raw.githubusercontent.com/beedywool/beedywool/refs/heads/cards"
 
-    def pic(dark, light, alt):
+    def pic(dark, light, alt, href=None):
+        # Les fragments #gh-*-mode-only suivent le thème choisi sur GitHub ; <picture> suivrait celui de l'appareil.
+        # GitHub masque le lien qui entoure l'image (href qui finit par le fragment), pas l'image : une image
+        # sans lien reçoit un lien automatique, une image liée doit porter le fragment dans son propre href.
         alt = escape(alt, quote=False).replace('"', "&quot;")
-        # Les fragments #gh-*-mode-only suivent le thème choisi sur GitHub ; <picture> suivrait celui de l'appareil
-        return (f'<img align="top" width="100%" alt="{alt}" src="{light}#gh-light-mode-only">'
-                f'<img align="top" width="100%" alt="{alt}" src="{dark}#gh-dark-mode-only">')
+        out = []
+        for mode, src in (("light", light), ("dark", dark)):
+            img = f'<img align="top" width="100%" alt="{alt}" src="{src}#gh-{mode}-mode-only">'
+            out.append(f'<a href="{href}#gh-{mode}-mode-only">{img}</a>' if href else img)
+        return "".join(out)
 
-    def asset(name, alt):
-        return pic(f"assets/{name}-dark.svg", f"assets/{name}-light.svg", alt)
+    def asset(name, alt, href=None):
+        return pic(f"assets/{name}-dark.svg", f"assets/{name}-light.svg", alt, href)
 
     def live(name, alt):
         return pic(f"{cards}/{name}-dark.svg", f"{cards}/{name}-light.svg", alt)
@@ -1114,8 +1119,8 @@ def write_readme(info):
     song_alt = f"Favorite song: {info['title']} by {info['artist']}"
     places_alt = " · ".join(f"{pl['label']}: {pl['city']}, {pl['country']}" for pl in PLACES)
     lines = [
-        f'<a href="{PORTFOLIO}">{asset("header", f"{NAME} | {TAGLINE}")}</a>',
-        f'<a href="{PORTFOLIO}">{asset("portfolio", "Visit my portfolio: " + PORTFOLIO.split("://", 1)[-1])}</a>',
+        asset("header", f"{NAME} | {TAGLINE}", PORTFOLIO),
+        asset("portfolio", "Visit my portfolio: " + PORTFOLIO.split("://", 1)[-1], PORTFOLIO),
         asset("section-about", "01 | About me"),
         asset("sub-intro", "Introduction"),
         asset("bio", f"Hi, I'm {NAME}. {BIO}"),
@@ -1123,11 +1128,12 @@ def write_readme(info):
         asset("sub-now", "Right now"),
         asset("facts", " · ".join(f"{l}: {v}" for l, v in ABOUT)),
         asset("sub-favorites", "Favorites"),
-        f'<a href="{info["url"]}">{asset("song", song_alt)}</a>',
+        asset("song", song_alt, info["url"]),
     ]
     if FAVORITES:
         fav_alt = " · ".join(f"{g['label']}: " + ", ".join(i["name"] for i in g["items"]) for g in FAVORITES)
-        lines.append(f'<a href="{PORTFOLIO}/#h-favorites">{asset("favorites", fav_alt)}</a>')
+        # Une URL n'a qu'un fragment : celui du thème remplace #h-favorites
+        lines.append(asset("favorites", fav_alt, PORTFOLIO))
     if TRAVEL["intro"]:
         been = ", ".join(n for n, _ in TRAVEL["been"])
         lines += [asset("sub-hobby", "Hobby"), asset("hobby", f"Travel: {TRAVEL['intro']} Been to: {been}")]
